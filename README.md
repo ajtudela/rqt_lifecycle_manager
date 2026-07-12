@@ -3,6 +3,7 @@
 ![ROS2](https://img.shields.io/badge/ros2-rolling-008000?logo=ros&logoColor=white)
 ![License](https://img.shields.io/github/license/ajtudela/rqt_lifecycle_manager)
 [![Build](https://github.com/ajtudela/rqt_lifecycle_manager/actions/workflows/build.yml/badge.svg?branch=rolling)](https://github.com/ajtudela/rqt_lifecycle_manager/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/ajtudela/rqt_lifecycle_manager/graph/badge.svg?token=6CCnSQ2pkM)](https://codecov.io/gh/ajtudela/rqt_lifecycle_manager)
 
 ## Overview
 
