@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     branches:
-      - main
+      - rolling
   pull_request:
 
 jobs:
@@ -15,12 +15,12 @@ jobs:
       - name: Setup ROS 2
         uses: ros-tooling/setup-ros@0.7.19
         with:
-          required-ros-distributions: jazzy
+          required-ros-distributions: rolling
       - name: Install dependencies
         uses: ros-tooling/action-ros-ci@0.4.8
         with:
           package-name: rqt_lifecycle_manager
-          target-ros2-distro: jazzy
+          target-ros2-distro: rolling
           colcon-defaults: |
             {
               "build": {
