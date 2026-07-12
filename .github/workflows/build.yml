@@ -5,6 +5,7 @@ on:
     branches:
       - jazzy
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
