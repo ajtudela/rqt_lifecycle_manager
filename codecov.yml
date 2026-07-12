@@ -1,0 +1,8 @@
+fixes:
+  - "rqt_lifecycle_manager::"
+
+ignore:
+  - "*/**/test/*"
+  - "*/test/**/*"
+  - "**/test_*.*"
+  - "**/main*.*"

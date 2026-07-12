@@ -1,0 +1,4 @@
+# Runtime dependencies are ROS 2 packages resolved via rosdep (see package.xml).
+# The following are only needed to run the test suite locally.
+pytest>=8.0.0
+pytest-cov>=5.0.0

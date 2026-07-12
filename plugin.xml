@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<library path="rqt_lifecycle_manager">
+  <class name="Lifecycle Manager"
+         type="rqt_lifecycle_manager.lifecycle_manager_plugin.LifecycleManagerPlugin"
+         base_class_type="rqt_gui_py::Plugin">
+    <description>
+      Inspect and control the state of ROS 2 lifecycle nodes from rqt.
+    </description>
+    <qtgui>
+      <group>
+        <label>Lifecycle</label>
+        <icon type="theme">applications-system</icon>
+        <statustip>Plugins to manage the ROS 2 node lifecycle.</statustip>
+      </group>
+      <label>Lifecycle Manager</label>
+      <icon type="theme">applications-system</icon>
+      <statustip>List lifecycle nodes and change their states.</statustip>
+    </qtgui>
+  </class>
+</library>

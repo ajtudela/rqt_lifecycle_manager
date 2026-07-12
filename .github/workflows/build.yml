@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.1.6
+      - name: Setup ROS 2
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+      - name: Install dependencies
+        uses: ros-tooling/action-ros-ci@v0.4
+        with:
+          package-name: rqt_lifecycle_manager
+          target-ros2-distro: jazzy
+          colcon-defaults: |
+            {
+              "build": {
+                "mixin": ["coverage-pytest"]
+              },
+              "test": {
+                "mixin": ["coverage-pytest"]
+              }
+            }
+          skip-tests: false
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.4.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ros_ws/coveragepy/.coverage
+          flags: unittests
+          name: codecov-umbrella
+          slug: ajtudela/rqt_lifecycle_manager
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unittests

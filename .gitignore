@@ -1,0 +1,40 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.egg
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# Environment variables
+.env
+.env.local
+
+# IDE-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code local configuration
+.claude/
+
+# ROS2 build artifacts
+log/
+install/
+
+# Distribution
+*.tar.gz
+*.whl

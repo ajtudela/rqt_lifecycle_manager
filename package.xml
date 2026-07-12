@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rqt_lifecycle_manager</name>
+  <version>0.1.0</version>
+  <description>rqt plugin to list ROS 2 lifecycle nodes and change their states from a non-blocking graphical interface.
+  </description>
+  <maintainer email="ajtudela@gmail.com">Alberto Tudela</maintainer>
+  <license>Apache-2.0</license>
+  <author email="ajtudela@gmail.com">Alberto Tudela</author>
+
+  <exec_depend>lifecycle_msgs</exec_depend>
+  <exec_depend>python_qt_binding</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rqt_gui</exec_depend>
+  <exec_depend>rqt_gui_py</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>ament_xmllint</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+    <rqt_gui plugin="${prefix}/plugin.xml"/>
+  </export>
+</package>
