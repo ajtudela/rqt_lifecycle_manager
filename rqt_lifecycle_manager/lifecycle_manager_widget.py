@@ -153,7 +153,7 @@ class LifecycleManagerWidget(QWidget):
         self._node_label.setStyleSheet('font-weight: bold; font-size: 14px;')
 
         self._state_label = QLabel('—')
-        self._state_label.setAlignment(Qt.AlignCenter)
+        self._state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._state_label.setMinimumHeight(36)
         self._reset_state_style()
 
@@ -175,7 +175,7 @@ class LifecycleManagerWidget(QWidget):
         right_widget = QWidget()
         right_widget.setLayout(right_layout)
 
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
         splitter.setStretchFactor(0, 1)
@@ -208,7 +208,7 @@ class LifecycleManagerWidget(QWidget):
         for name in names:
             self._node_list.addItem(QListWidgetItem(name))
         if selected in names:
-            items = self._node_list.findItems(selected, Qt.MatchExactly)
+            items = self._node_list.findItems(selected, Qt.MatchFlag.MatchExactly)
             if items:
                 self._node_list.setCurrentItem(items[0])
         self._node_list.blockSignals(False)
