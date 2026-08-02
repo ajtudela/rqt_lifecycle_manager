@@ -2,6 +2,49 @@
 Changelog for package rqt_lifecycle_manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.0 (02-08-2026)
+------------------
+
+Added
+-----
+* Added ``LifecycleManager.subscribe_to_transitions()`` in ``lifecycle_manager.py``,
+  subscribing to a node's ``<node>/transition_event`` topic
+  (``lifecycle_msgs/msg/TransitionEvent``) so state changes are pushed instantly instead of
+  waiting for the next polling cycle.
+* Added ``LifecycleManager.release_node()`` to destroy the cached service clients and
+  transition_event subscription of a single node.
+* Added a color-coded dashboard icon per row in ``LifecycleManagerWidget``'s node list,
+  reflecting every discovered node's last known state at a glance instead of only the
+  selected one.
+* Added a ``QSpinBox`` (200-10000 ms) next to the auto-refresh checkbox to make the polling
+  interval configurable, persisted as ``refresh_interval_ms`` via
+  ``LifecycleManagerPlugin.save_settings``/``restore_settings``.
+* Added an optional ``manager`` constructor parameter to ``LifecycleManagerWidget`` so tests
+  can inject a stub backend instead of monkey-patching ``_manager`` after construction.
+* Added 39 new test cases (110 total, up from 71) covering all of the above plus the
+  ``threading.Lock`` guarding ``LifecycleManager._pending``.
+
+Changed
+-------
+* Changed ``LifecycleManagerWidget`` to query ``get_available_transitions`` only when a
+  node's reported ``state_id`` changes, instead of on every polling cycle.
+* Changed the periodic refresh timer to only re-scan the discovered node list; per-node state
+  now arrives via the ``transition_event`` subscription established for every discovered node.
+* Changed ``LifecycleManagerWidget._reset_state_style()`` to derive the neutral state colors
+  from ``self.palette()`` instead of hardcoded light-theme hex values, so it follows a dark
+  rqt theme too.
+* Changed ``main(args=None)`` in ``main.py`` to forward ``args`` when given instead of always
+  using ``sys.argv``.
+* Changed ``LifecycleManager._pending`` to be guarded by a ``threading.Lock`` and documented
+  the manager's threading model in its class docstring.
+* Changed the README to consistently reference ROS 2 Rolling (tested-under note, rosdep
+  target and docs.ros.org links), matching the CI workflow and badges.
+
+Fixed
+-----
+* Fixed unbounded growth of cached service clients and subscriptions: resources are now
+  released via ``LifecycleManager.release_node()`` as soon as a node leaves the graph.
+
 0.1.0 (12-07-2026)
 ------------------
 * Initial release.
