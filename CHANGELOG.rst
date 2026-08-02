@@ -14,7 +14,7 @@ Changelog for package rqt_lifecycle_manager
   ``rqt_gui_py`` entry class, plus a standalone entry point in ``main.py``.
 * Registered the rqt plugin through ``plugin.xml``.
 * Added a test suite reaching 99% statement coverage (71 tests, all passing
-  under ROS 2 Jazzy):
+  under ROS 2 Rolling):
 
   - ``test/test_lifecycle_manager.py`` with 21 cases covering node discovery,
     the asynchronous ``get_state`` / ``get_available_transitions`` /

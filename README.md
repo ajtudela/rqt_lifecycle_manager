@@ -21,7 +21,7 @@ The interface **never blocks**: every ROS 2 service call is issued asynchronousl
 
 **Author: Alberto Tudela<br />**
 
-The package has been tested under [ROS2] Jazzy on [Ubuntu] 24.04. This is research code, expect that it changes often and any fitness for a particular purpose is disclaimed.
+The package has been tested under [ROS2] Rolling on [Ubuntu] 24.04. This is research code, expect that it changes often and any fitness for a particular purpose is disclaimed.
 
 ## How it works
 
@@ -39,7 +39,7 @@ All service calls use `call_async`. The plugin reuses the ROS 2 node that `rqt_g
 
 #### Dependencies
 
-- [Robot Operating System (ROS) 2](https://docs.ros.org/en/jazzy/) (middleware for robotics)
+- [Robot Operating System (ROS) 2](https://docs.ros.org/en/rolling/) (middleware for robotics)
 - `rqt_gui`, `rqt_gui_py`, `python_qt_binding` (rqt framework)
 - `lifecycle_msgs` (lifecycle service and message types)
 
@@ -51,7 +51,7 @@ To build from source, clone the latest version from this repository into your co
 cd colcon_workspace/src
 git clone https://github.com/ajtudela/rqt_lifecycle_manager.git
 cd ../
-rosdep install -i --from-path src --rosdistro jazzy -y
+rosdep install -i --from-path src --rosdistro rolling -y
 colcon build --symlink-install
 ```
 
@@ -97,6 +97,6 @@ This package does not provide a runtime node; it provides an rqt plugin. The plu
   Triggers a lifecycle transition.
 
 [Ubuntu]: https://ubuntu.com/
-[ROS2]: https://docs.ros.org/en/jazzy/
-[rqt]: https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-RQt.html
+[ROS2]: https://docs.ros.org/en/rolling/
+[rqt]: https://docs.ros.org/en/rolling/Concepts/Intermediate/About-RQt.html
 [lifecycle]: https://design.ros2.org/articles/node_lifecycle.html
