@@ -34,6 +34,7 @@ from python_qt_binding.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QSpinBox,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -63,8 +64,12 @@ _TRANSITION_GOAL_LABELS = {
     'shutdown': 'finalized',
 }
 
-# How often, in milliseconds, the selected node is polled for state changes.
-_REFRESH_INTERVAL_MS = 1000
+# Default, minimum, maximum and step (all in ms) for the refresh interval
+# the user can pick from the GUI.
+_DEFAULT_REFRESH_INTERVAL_MS = 1000
+_MIN_REFRESH_INTERVAL_MS = 200
+_MAX_REFRESH_INTERVAL_MS = 10000
+_REFRESH_INTERVAL_STEP_MS = 100
 
 
 class LifecycleManagerWidget(QWidget):
@@ -118,7 +123,7 @@ class LifecycleManagerWidget(QWidget):
         # Periodic, non-blocking refresh running on the GUI thread.
         self._refresh_timer = QTimer(self)
         self._refresh_timer.timeout.connect(self._refresh)
-        self._refresh_timer.start(_REFRESH_INTERVAL_MS)
+        self._refresh_timer.start(self._interval_spinbox.value())
 
         self._refresh()
 
@@ -139,9 +144,20 @@ class LifecycleManagerWidget(QWidget):
         self._auto_refresh.setChecked(True)
         self._auto_refresh.toggled.connect(self._on_auto_refresh_toggled)
 
+        self._interval_spinbox = QSpinBox()
+        self._interval_spinbox.setRange(
+            _MIN_REFRESH_INTERVAL_MS, _MAX_REFRESH_INTERVAL_MS)
+        self._interval_spinbox.setSingleStep(_REFRESH_INTERVAL_STEP_MS)
+        self._interval_spinbox.setValue(_DEFAULT_REFRESH_INTERVAL_MS)
+        self._interval_spinbox.setSuffix(' ms')
+        self._interval_spinbox.valueChanged.connect(
+            self._on_refresh_interval_changed)
+
         controls = QHBoxLayout()
         controls.addWidget(self._refresh_button)
         controls.addWidget(self._auto_refresh)
+        controls.addWidget(QLabel('Interval:'))
+        controls.addWidget(self._interval_spinbox)
         controls.addStretch(1)
 
         left_layout = QVBoxLayout()
@@ -254,9 +270,14 @@ class LifecycleManagerWidget(QWidget):
     def _on_auto_refresh_toggled(self, enabled: bool) -> None:
         """Start or stop the periodic refresh timer."""
         if enabled:
-            self._refresh_timer.start(_REFRESH_INTERVAL_MS)
+            self._refresh_timer.start(self._interval_spinbox.value())
         else:
             self._refresh_timer.stop()
+
+    def _on_refresh_interval_changed(self, interval_ms: int) -> None:
+        """Apply a new polling interval to the running timer, if active."""
+        if self._refresh_timer.isActive():
+            self._refresh_timer.start(interval_ms)
 
     def _request_transition(self, transition_id: int, label: str) -> None:
         """Trigger the given transition on the selected node."""
@@ -379,6 +400,14 @@ class LifecycleManagerWidget(QWidget):
     def set_auto_refresh_enabled(self, enabled: bool) -> None:
         """Enable or disable the periodic refresh (restores saved value)."""
         self._auto_refresh.setChecked(enabled)
+
+    def refresh_interval_ms(self) -> int:
+        """Return the currently configured polling interval, in ms."""
+        return self._interval_spinbox.value()
+
+    def set_refresh_interval_ms(self, interval_ms: int) -> None:
+        """Restore a previously saved polling interval, in ms."""
+        self._interval_spinbox.setValue(interval_ms)
 
     def shutdown(self) -> None:
         """Stop the timer and release all ROS 2 resources."""

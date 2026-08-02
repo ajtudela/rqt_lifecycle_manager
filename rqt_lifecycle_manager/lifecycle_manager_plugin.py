@@ -66,13 +66,19 @@ class LifecycleManagerPlugin(Plugin):
         self._widget.shutdown()
 
     def save_settings(self, plugin_settings, instance_settings) -> None:
-        """Persist the auto-refresh preference across sessions."""
+        """Persist the auto-refresh preference and interval across sessions."""
         instance_settings.set_value(
             'auto_refresh', self._widget.is_auto_refresh_enabled())
+        instance_settings.set_value(
+            'refresh_interval_ms', self._widget.refresh_interval_ms())
 
     def restore_settings(self, plugin_settings, instance_settings) -> None:
-        """Restore the auto-refresh preference from a previous session."""
+        """Restore the auto-refresh preference and interval from a session."""
         value = instance_settings.value('auto_refresh', True)
         # QSettings may return the boolean as a string; normalize it.
         enabled = value in (True, 'true', 'True', 1, '1')
         self._widget.set_auto_refresh_enabled(enabled)
+
+        interval_ms = instance_settings.value('refresh_interval_ms', 1000)
+        # QSettings may return the number as a string; normalize it.
+        self._widget.set_refresh_interval_ms(int(interval_ms))
