@@ -21,6 +21,7 @@ without needing a display server or a live ROS 2 graph.
 """
 
 import pytest
+from python_qt_binding.QtGui import QPalette
 from python_qt_binding.QtWidgets import QLabel, QPushButton
 from rqt_lifecycle_manager.lifecycle_manager_widget import (
     LifecycleManagerWidget,
@@ -238,6 +239,19 @@ def test_state_of_another_node_is_ignored(widget):
     view._update_state('/other', 4, 'finalized')
 
     assert view._state_label.text() == 'ACTIVE'
+
+
+def test_neutral_state_style_follows_the_active_palette(widget):
+    """With no state reported, the label uses the widget's palette colors."""
+    view, _ = widget
+    palette = view.palette()
+    expected_background = palette.color(QPalette.ColorRole.Window).name()
+    expected_foreground = palette.color(QPalette.ColorRole.WindowText).name()
+
+    style = view._state_label.styleSheet()
+
+    assert expected_background in style
+    assert expected_foreground in style
 
 
 # ---------------------------------------------------------------------------
