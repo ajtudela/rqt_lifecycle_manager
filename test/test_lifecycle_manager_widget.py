@@ -504,6 +504,48 @@ def test_re_enabling_auto_refresh_restarts_the_timer(widget):
     assert view._refresh_timer.isActive()
 
 
+def test_default_refresh_interval_is_one_second(widget):
+    """The widget starts with the default 1000 ms polling interval."""
+    view, _ = widget
+
+    assert view.refresh_interval_ms() == 1000
+    assert view._refresh_timer.interval() == 1000
+
+
+def test_changing_the_interval_reconfigures_the_running_timer(widget):
+    """Picking a new interval takes effect immediately while active."""
+    view, _ = widget
+
+    view._interval_spinbox.setValue(2000)
+
+    assert view.refresh_interval_ms() == 2000
+    assert view._refresh_timer.interval() == 2000
+    assert view._refresh_timer.isActive()
+
+
+def test_changing_the_interval_while_stopped_does_not_start_the_timer(
+    widget,
+):
+    """A new interval is stored but does not restart a stopped timer."""
+    view, _ = widget
+    view.set_auto_refresh_enabled(False)
+
+    view._interval_spinbox.setValue(3000)
+
+    assert not view._refresh_timer.isActive()
+    view.set_auto_refresh_enabled(True)
+    assert view._refresh_timer.interval() == 3000
+
+
+def test_set_refresh_interval_restores_a_saved_value(widget):
+    """set_refresh_interval_ms() restores a previously persisted interval."""
+    view, _ = widget
+
+    view.set_refresh_interval_ms(500)
+
+    assert view.refresh_interval_ms() == 500
+
+
 def test_shutdown_stops_timer_and_releases_backend(widget):
     """Shutting the widget down stops the timer and frees ROS resources."""
     view, manager = widget

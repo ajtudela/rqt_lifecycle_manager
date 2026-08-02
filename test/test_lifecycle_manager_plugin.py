@@ -128,6 +128,17 @@ def test_save_settings_persists_auto_refresh(plugin):
     assert settings.values['auto_refresh'] is False
 
 
+def test_save_settings_persists_refresh_interval(plugin):
+    """The polling interval is written to the instance settings."""
+    instance, _ = plugin
+    instance._widget.set_refresh_interval_ms(2500)
+    settings = _FakeSettings()
+
+    instance.save_settings(_FakeSettings(), settings)
+
+    assert settings.values['refresh_interval_ms'] == 2500
+
+
 @pytest.mark.parametrize('stored, expected', [
     (True, True),
     ('true', True),
@@ -155,3 +166,29 @@ def test_restore_settings_defaults_to_enabled(plugin):
     instance.restore_settings(_FakeSettings(), _FakeSettings())
 
     assert instance._widget.is_auto_refresh_enabled() is True
+
+
+@pytest.mark.parametrize('stored, expected', [
+    (2500, 2500),
+    ('2500', 2500),
+])
+def test_restore_settings_normalizes_refresh_interval(
+    plugin, stored, expected,
+):
+    """Stored intervals may come back as strings, so they are normalized."""
+    instance, _ = plugin
+    settings = _FakeSettings({'refresh_interval_ms': stored})
+
+    instance.restore_settings(_FakeSettings(), settings)
+
+    assert instance._widget.refresh_interval_ms() == expected
+
+
+def test_restore_settings_defaults_refresh_interval_to_one_second(plugin):
+    """With nothing stored, the polling interval stays at 1000 ms."""
+    instance, _ = plugin
+    instance._widget.set_refresh_interval_ms(2500)
+
+    instance.restore_settings(_FakeSettings(), _FakeSettings())
+
+    assert instance._widget.refresh_interval_ms() == 1000
