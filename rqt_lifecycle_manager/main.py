@@ -37,7 +37,9 @@ def main(args=None) -> int:
     Parameters
     ----------
     args : list, optional
-        Unused; command-line arguments are read from ``sys.argv``.
+        Command-line arguments to forward to rqt. Defaults to ``sys.argv``
+        when omitted, which is what a plain ``ros2 run`` invocation relies
+        on; callers (e.g. tests) may pass an explicit list instead.
 
     Returns
     -------
@@ -46,7 +48,7 @@ def main(args=None) -> int:
 
     """
     app = Main()
-    return app.main(sys.argv, standalone=PLUGIN)
+    return app.main(sys.argv if args is None else args, standalone=PLUGIN)
 
 
 if __name__ == '__main__':
