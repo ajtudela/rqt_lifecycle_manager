@@ -418,3 +418,46 @@ def test_client_targets_the_expected_service_name(suffix):
     manager.async_change_state('/n', 1, lambda *args: None)
 
     assert f'/n{suffix}' in node.clients
+
+
+# ---------------------------------------------------------------------------
+# release_node
+# ---------------------------------------------------------------------------
+
+
+def test_release_node_destroys_only_its_own_clients():
+    """release_node() frees the target node's clients, not other nodes'."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+    manager.async_get_state('/a', lambda *args: None)
+    manager.async_get_state('/b', lambda *args: None)
+
+    manager.release_node('/a')
+
+    assert node.clients['/a/get_state'] in node.destroyed
+    assert node.clients['/b/get_state'] not in node.destroyed
+
+
+def test_release_node_allows_a_fresh_request_afterwards():
+    """A poll issued after release creates a brand new client."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+    manager.async_get_state('/a', lambda *args: None)
+    first = node.clients['/a/get_state']
+
+    manager.release_node('/a')
+    manager.async_get_state('/a', lambda *args: None)
+
+    # A new client was created (the request was not silently deduplicated
+    # against the stale in-flight bookkeeping of the released node).
+    assert node.clients['/a/get_state'] is not first
+
+
+def test_release_node_is_a_no_op_for_an_unknown_node():
+    """Releasing a node with no cached clients does not raise."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+
+    manager.release_node('/never-queried')
+
+    assert node.destroyed == []

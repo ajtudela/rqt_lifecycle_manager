@@ -233,9 +233,11 @@ class LifecycleManagerWidget(QWidget):
                 self._node_list.setCurrentItem(items[0])
         self._node_list.blockSignals(False)
 
-        # The previously selected node disappeared from the graph.
+        # The previously selected node disappeared from the graph: drop its
+        # cached service clients along with the details panel.
         if selected is not None and selected not in names:
             self._selected_node = None
+            self._manager.release_node(selected)
             self._clear_details()
 
     def _poll_selected(self) -> None:
@@ -260,7 +262,11 @@ class LifecycleManagerWidget(QWidget):
         items = self._node_list.selectedItems()
         if not items:
             return
+        previous = self._selected_node
         self._selected_node = items[0].text()
+        # Release the clients of the node we are switching away from.
+        if previous is not None and previous != self._selected_node:
+            self._manager.release_node(previous)
         self._node_label.setText(self._selected_node)
         self._status_label.setText('')
         # Force a rebuild and a fresh transitions query for the new node.

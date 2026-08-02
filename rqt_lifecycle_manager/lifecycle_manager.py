@@ -199,6 +199,32 @@ class LifecycleManager:
     # Lifecycle of the manager itself
     # -------------------------------------------------------------------------
 
+    def release_node(self, node_name: str) -> None:
+        """
+        Destroy every cached service client for a single node.
+
+        The manager only ever talks to one node at a time (the one selected
+        in the GUI), so callers should invoke this whenever that node is
+        deselected or disappears from the graph. Without it, clients (and
+        their associated DDS resources) would otherwise accumulate for every
+        node visited during a session, only being freed on ``shutdown()``.
+
+        Parameters
+        ----------
+        node_name : str
+            Fully-qualified name of the node whose clients should be freed.
+
+        """
+        for cache in (
+            self._get_state_clients,
+            self._change_state_clients,
+            self._get_transitions_clients,
+        ):
+            client = cache.pop(node_name, None)
+            if client is not None:
+                self._node.destroy_client(client)
+        self._pending = {key for key in self._pending if key[0] != node_name}
+
     def shutdown(self) -> None:
         """Destroy every cached service client and clear internal state."""
         for cache in (

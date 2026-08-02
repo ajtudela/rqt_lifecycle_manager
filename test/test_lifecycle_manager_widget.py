@@ -37,6 +37,7 @@ class _FakeManager:
         self.state_requests = []
         self.transition_requests = []
         self.change_requests = []
+        self.released_nodes = []
         self.shutdown_called = False
 
     def get_lifecycle_node_names(self):
@@ -54,6 +55,10 @@ class _FakeManager:
     def async_change_state(self, node_name, transition_id, on_result):
         """Record a transition request."""
         self.change_requests.append((node_name, transition_id, on_result))
+
+    def release_node(self, node_name):
+        """Record that the caller released the given node."""
+        self.released_nodes.append(node_name)
 
     def shutdown(self):
         """Record that the widget released the backend."""
@@ -151,6 +156,42 @@ def test_vanished_node_clears_the_details_panel(widget):
     assert view._selected_node is None
     assert view._node_label.text() == 'No node selected'
     assert _transition_buttons(view) == []
+
+
+def test_vanished_node_releases_its_service_clients(widget):
+    """A node leaving the graph also frees its cached service clients."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+    _select_first_node(view)
+
+    manager.names = []
+    view._refresh()
+
+    assert manager.released_nodes == ['/a']
+
+
+def test_switching_selection_releases_the_previous_node(widget):
+    """Selecting a new node frees the clients of the one left behind."""
+    view, manager = widget
+    manager.names = ['/a', '/b']
+    view._refresh()
+    view._node_list.setCurrentRow(0)
+
+    view._node_list.setCurrentRow(1)
+
+    assert manager.released_nodes == ['/a']
+
+
+def test_first_selection_releases_nothing(widget):
+    """Selecting a node with nothing previously selected releases none."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+
+    _select_first_node(view)
+
+    assert manager.released_nodes == []
 
 
 def test_polling_without_selection_makes_no_request(widget):
