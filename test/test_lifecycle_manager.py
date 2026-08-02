@@ -22,7 +22,12 @@ still exercising the real asynchronous code paths (including the callbacks
 that would normally run on the executor thread).
 """
 
-from lifecycle_msgs.msg import State, Transition, TransitionDescription
+from lifecycle_msgs.msg import (
+    State,
+    Transition,
+    TransitionDescription,
+    TransitionEvent,
+)
 from lifecycle_msgs.srv import ChangeState, GetAvailableTransitions, GetState
 import pytest
 from rqt_lifecycle_manager.lifecycle_manager import LifecycleManager
@@ -91,6 +96,21 @@ class _FakeLogger:
         self.warnings.append(message)
 
 
+class _FakeSubscription:
+    """Stub of an rclpy subscription that can replay a received message."""
+
+    def __init__(self, msg_type, topic, callback, queue_depth):
+        """Record the subscription parameters for later inspection."""
+        self.msg_type = msg_type
+        self.topic = topic
+        self.callback = callback
+        self.queue_depth = queue_depth
+
+    def deliver(self, msg):
+        """Simulate a message arriving on the executor thread."""
+        self.callback(msg)
+
+
 class _FakeNode:
     """Stub of an rclpy node exposing graph queries and client factories."""
 
@@ -100,6 +120,8 @@ class _FakeNode:
         self._ready = ready
         self.clients = {}
         self.destroyed = []
+        self.subscriptions = {}
+        self.destroyed_subscriptions = []
         self.logger = _FakeLogger()
 
     def get_service_names_and_types(self):
@@ -115,6 +137,16 @@ class _FakeNode:
     def destroy_client(self, client):
         """Record the client destruction requested on shutdown."""
         self.destroyed.append(client)
+
+    def create_subscription(self, msg_type, topic, callback, queue_depth):
+        """Create (and remember) a fake subscription for the given topic."""
+        subscription = _FakeSubscription(msg_type, topic, callback, queue_depth)
+        self.subscriptions[topic] = subscription
+        return subscription
+
+    def destroy_subscription(self, subscription):
+        """Record the subscription destruction requested by the manager."""
+        self.destroyed_subscriptions.append(subscription)
 
     def get_logger(self):
         """Return the stub logger."""
@@ -147,6 +179,15 @@ def _change_state_response(success):
     response = ChangeState.Response()
     response.success = success
     return response
+
+
+def _transition_event(goal_id, goal_label):
+    """Build a TransitionEvent announcing the given resulting state."""
+    return TransitionEvent(
+        transition=Transition(id=0, label='transitioning'),
+        start_state=State(id=0, label='unknown'),
+        goal_state=State(id=goal_id, label=goal_label),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -369,6 +410,47 @@ def test_async_change_state_reports_exception_message():
 
 
 # ---------------------------------------------------------------------------
+# subscribe_to_transitions
+# ---------------------------------------------------------------------------
+
+
+def test_subscribe_to_transitions_targets_the_expected_topic():
+    """The subscription is created on '<node>/transition_event'."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+
+    manager.subscribe_to_transitions('/n', lambda *args: None)
+
+    assert '/n/transition_event' in node.subscriptions
+    assert node.subscriptions['/n/transition_event'].msg_type is TransitionEvent
+
+
+def test_subscribe_to_transitions_reports_the_goal_state():
+    """An incoming event forwards the resulting (id, label) as the state."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+    results = []
+
+    manager.subscribe_to_transitions('/n', lambda *args: results.append(args))
+    node.subscriptions['/n/transition_event'].deliver(
+        _transition_event(3, 'active'))
+
+    assert results == [('/n', 3, 'active')]
+
+
+def test_subscribe_to_transitions_is_idempotent():
+    """A second subscribe call for the same node creates no new subscription."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+
+    manager.subscribe_to_transitions('/n', lambda *args: None)
+    first = node.subscriptions['/n/transition_event']
+    manager.subscribe_to_transitions('/n', lambda *args: None)
+
+    assert node.subscriptions['/n/transition_event'] is first
+
+
+# ---------------------------------------------------------------------------
 # Client caching and shutdown
 # ---------------------------------------------------------------------------
 
@@ -401,6 +483,18 @@ def test_shutdown_destroys_every_client():
     # A later poll must create a brand new client rather than reuse a dead one.
     manager.async_get_state('/n', lambda *args: None)
     assert node.clients['/n/get_state'] not in node.destroyed
+
+
+def test_shutdown_destroys_every_subscription():
+    """Shutdown also destroys the cached transition_event subscriptions."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+    manager.subscribe_to_transitions('/n', lambda *args: None)
+
+    manager.shutdown()
+
+    assert node.destroyed_subscriptions == [
+        node.subscriptions['/n/transition_event']]
 
 
 @pytest.mark.parametrize('suffix', [
@@ -461,3 +555,28 @@ def test_release_node_is_a_no_op_for_an_unknown_node():
     manager.release_node('/never-queried')
 
     assert node.destroyed == []
+
+
+def test_release_node_destroys_the_transition_subscription():
+    """release_node() also frees the node's transition_event subscription."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+    manager.subscribe_to_transitions('/a', lambda *args: None)
+    subscription = node.subscriptions['/a/transition_event']
+
+    manager.release_node('/a')
+
+    assert node.destroyed_subscriptions == [subscription]
+
+
+def test_release_node_allows_resubscribing():
+    """After release, subscribing to the same node creates a fresh one."""
+    node = _FakeNode()
+    manager = LifecycleManager(node)
+    manager.subscribe_to_transitions('/a', lambda *args: None)
+    first = node.subscriptions['/a/transition_event']
+
+    manager.release_node('/a')
+    manager.subscribe_to_transitions('/a', lambda *args: None)
+
+    assert node.subscriptions['/a/transition_event'] is not first

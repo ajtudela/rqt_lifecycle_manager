@@ -39,6 +39,7 @@ class _FakeManager:
         self.transition_requests = []
         self.change_requests = []
         self.released_nodes = []
+        self.subscribed_nodes = []
         self.shutdown_called = False
 
     def get_lifecycle_node_names(self):
@@ -60,6 +61,10 @@ class _FakeManager:
     def release_node(self, node_name):
         """Record that the caller released the given node."""
         self.released_nodes.append(node_name)
+
+    def subscribe_to_transitions(self, node_name, on_event):
+        """Record a transition_event subscription request."""
+        self.subscribed_nodes.append((node_name, on_event))
 
     def shutdown(self):
         """Record that the widget released the backend."""
@@ -163,6 +168,34 @@ def test_selecting_a_node_polls_its_state(widget):
     assert manager.state_requests[-1][0] == '/a'
     # Transitions are only queried once the state response arrives.
     assert manager.transition_requests == []
+
+
+def test_selecting_a_node_subscribes_to_its_transition_events(widget):
+    """Selecting a node also subscribes to its push-based state updates."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+
+    _select_first_node(view)
+
+    assert manager.subscribed_nodes[-1][0] == '/a'
+
+
+def test_periodic_refresh_does_not_re_poll_the_selected_node(widget):
+    """Once selected, the timer-driven refresh no longer polls the state.
+
+    State updates arrive via the transition_event subscription instead; the
+    periodic refresh only re-scans the discovered node list.
+    """
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+    _select_first_node(view)
+    requests_before = len(manager.state_requests)
+
+    view._refresh()
+
+    assert len(manager.state_requests) == requests_before
 
 
 def test_vanished_node_clears_the_details_panel(widget):
