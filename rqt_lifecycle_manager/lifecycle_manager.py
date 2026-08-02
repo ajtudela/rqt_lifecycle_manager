@@ -23,6 +23,7 @@ thread) is never blocked waiting for a response.
 
 from __future__ import annotations
 
+import threading
 from typing import Callable, Dict, List, Set, Tuple
 
 from lifecycle_msgs.msg import Transition
@@ -55,6 +56,14 @@ class LifecycleManager:
     with ``call_async`` and their results are forwarded to the supplied
     callbacks from the executor thread.
 
+    Threading model: the ``async_*`` methods are meant to be called from the
+    GUI thread (typically from a ``QTimer``), while the ``_on_*_response``
+    done-callbacks run on the executor thread that spins ``node``, and may
+    overlap with each other under a ``ReentrantCallbackGroup``. The only
+    state shared between those two threads is ``_pending``, which is guarded
+    by ``_pending_lock`` to make the check-then-act membership test and the
+    add/discard that follow it atomic.
+
     Parameters
     ----------
     node : rclpy.node.Node
@@ -79,7 +88,10 @@ class LifecycleManager:
         self._change_state_clients: Dict[str, Client] = {}
         self._get_transitions_clients: Dict[str, Client] = {}
         # Keys of polling requests currently in flight, to avoid flooding.
+        # Mutated from both the GUI thread (add) and the executor thread
+        # (discard), so every access goes through `_pending_lock`.
         self._pending: Set[Tuple[str, str]] = set()
+        self._pending_lock = threading.Lock()
 
     # -------------------------------------------------------------------------
     # Discovery
@@ -125,13 +137,14 @@ class LifecycleManager:
 
         """
         key = (node_name, 'state')
-        if key in self._pending:
-            return
         client = self._client(
             self._get_state_clients, node_name, GET_STATE_SUFFIX, GetState)
         if not client.service_is_ready():
             return
-        self._pending.add(key)
+        with self._pending_lock:
+            if key in self._pending:
+                return
+            self._pending.add(key)
         future = client.call_async(GetState.Request())
         future.add_done_callback(
             lambda f: self._on_state_response(node_name, f, on_result, key))
@@ -152,14 +165,15 @@ class LifecycleManager:
 
         """
         key = (node_name, 'transitions')
-        if key in self._pending:
-            return
         client = self._client(
             self._get_transitions_clients, node_name,
             GET_AVAILABLE_TRANSITIONS_SUFFIX, GetAvailableTransitions)
         if not client.service_is_ready():
             return
-        self._pending.add(key)
+        with self._pending_lock:
+            if key in self._pending:
+                return
+            self._pending.add(key)
         future = client.call_async(GetAvailableTransitions.Request())
         future.add_done_callback(
             lambda f: self._on_transitions_response(
@@ -223,7 +237,9 @@ class LifecycleManager:
             client = cache.pop(node_name, None)
             if client is not None:
                 self._node.destroy_client(client)
-        self._pending = {key for key in self._pending if key[0] != node_name}
+        with self._pending_lock:
+            self._pending = {
+                key for key in self._pending if key[0] != node_name}
 
     def shutdown(self) -> None:
         """Destroy every cached service client and clear internal state."""
@@ -235,7 +251,8 @@ class LifecycleManager:
             for client in cache.values():
                 self._node.destroy_client(client)
             cache.clear()
-        self._pending.clear()
+        with self._pending_lock:
+            self._pending.clear()
 
     # -------------------------------------------------------------------------
     # Internal helpers
@@ -259,7 +276,8 @@ class LifecycleManager:
         key: Tuple[str, str]
     ) -> None:
         """Forward the get_state response, guarding against failures."""
-        self._pending.discard(key)
+        with self._pending_lock:
+            self._pending.discard(key)
         try:
             response = future.result()
         except Exception as exc:  # noqa: BLE001 - surface any service error
@@ -274,7 +292,8 @@ class LifecycleManager:
         key: Tuple[str, str]
     ) -> None:
         """Forward the available-transitions response as simple tuples."""
-        self._pending.discard(key)
+        with self._pending_lock:
+            self._pending.discard(key)
         try:
             response = future.result()
         except Exception as exc:  # noqa: BLE001 - surface any service error
