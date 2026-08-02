@@ -122,8 +122,8 @@ def test_node_list_is_not_rebuilt_when_unchanged(widget):
     assert view._node_list.item(0) is first_item
 
 
-def test_selecting_a_node_polls_state_and_transitions(widget):
-    """Selecting a node shows its name and polls state plus transitions."""
+def test_selecting_a_node_polls_its_state(widget):
+    """Selecting a node shows its name and polls its state."""
     view, manager = widget
     manager.names = ['/a']
     view._refresh()
@@ -133,7 +133,8 @@ def test_selecting_a_node_polls_state_and_transitions(widget):
     assert view._selected_node == '/a'
     assert view._node_label.text() == '/a'
     assert manager.state_requests[-1][0] == '/a'
-    assert manager.transition_requests[-1][0] == '/a'
+    # Transitions are only queried once the state response arrives.
+    assert manager.transition_requests == []
 
 
 def test_vanished_node_clears_the_details_panel(widget):
@@ -237,6 +238,54 @@ def test_state_of_another_node_is_ignored(widget):
     view._update_state('/other', 4, 'finalized')
 
     assert view._state_label.text() == 'ACTIVE'
+
+
+# ---------------------------------------------------------------------------
+# State-driven transitions refresh
+# ---------------------------------------------------------------------------
+
+
+def test_state_change_triggers_a_transitions_request(widget):
+    """A newly reported state id triggers a fresh transitions query."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+    _select_first_node(view)
+
+    view._update_state('/a', 3, 'active')
+
+    assert manager.transition_requests[-1][0] == '/a'
+
+
+def test_unchanged_state_does_not_request_transitions_again(widget):
+    """Repeating the same state id does not re-query the transitions."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+    _select_first_node(view)
+    view._update_state('/a', 3, 'active')
+    requests_before = len(manager.transition_requests)
+
+    view._update_state('/a', 3, 'active')
+
+    assert len(manager.transition_requests) == requests_before
+
+
+def test_selecting_a_node_requests_transitions_even_with_same_state_id(
+    widget,
+):
+    """Switching nodes forces a query even if the state id repeats."""
+    view, manager = widget
+    manager.names = ['/a', '/b']
+    view._refresh()
+    view._node_list.setCurrentRow(0)
+    view._update_state('/a', 3, 'active')
+    manager.transition_requests.clear()
+
+    view._node_list.setCurrentRow(1)
+    view._update_state('/b', 3, 'active')
+
+    assert manager.transition_requests[-1][0] == '/b'
 
 
 # ---------------------------------------------------------------------------

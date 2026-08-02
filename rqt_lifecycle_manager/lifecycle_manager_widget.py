@@ -104,6 +104,9 @@ class LifecycleManagerWidget(QWidget):
         # Cache of the transitions currently shown, to avoid needless rebuilds.
         self._displayed_transitions: Optional[
             List[Tuple[int, str, str]]] = None
+        # Last state id seen for the selected node, used to re-query the
+        # available transitions only when the state actually changes.
+        self._last_state_id: Optional[int] = None
 
         self._build_ui()
 
@@ -219,13 +222,17 @@ class LifecycleManagerWidget(QWidget):
             self._clear_details()
 
     def _poll_selected(self) -> None:
-        """Asynchronously request the state and transitions of the node."""
+        """Asynchronously request the state of the selected node.
+
+        The available transitions are a deterministic function of the
+        current state, so they are only re-queried from ``_update_state``
+        when the reported ``state_id`` actually changes, instead of on
+        every polling cycle.
+        """
         if self._selected_node is None:
             return
         self._manager.async_get_state(
             self._selected_node, self.state_received.emit)
-        self._manager.async_get_available_transitions(
-            self._selected_node, self.transitions_received.emit)
 
     # -------------------------------------------------------------------------
     # User interactions (GUI thread)
@@ -239,8 +246,9 @@ class LifecycleManagerWidget(QWidget):
         self._selected_node = items[0].text()
         self._node_label.setText(self._selected_node)
         self._status_label.setText('')
-        # Force a rebuild for the newly selected node.
+        # Force a rebuild and a fresh transitions query for the new node.
         self._displayed_transitions = None
+        self._last_state_id = None
         self._poll_selected()
 
     def _on_auto_refresh_toggled(self, enabled: bool) -> None:
@@ -275,6 +283,12 @@ class LifecycleManagerWidget(QWidget):
         self._state_label.setStyleSheet(
             f'background-color: {color}; color: white; font-weight: bold; '
             f'padding: 6px; border-radius: 4px;')
+        # The available transitions only change together with the state, so
+        # they are re-queried here instead of on every polling cycle.
+        if state_id != self._last_state_id:
+            self._last_state_id = state_id
+            self._manager.async_get_available_transitions(
+                node_name, self.transitions_received.emit)
 
     def _update_transitions(
         self, node_name: str, transitions: List[Tuple[int, str, str]]
@@ -351,6 +365,7 @@ class LifecycleManagerWidget(QWidget):
         self._reset_state_style()
         self._clear_transitions()
         self._displayed_transitions = None
+        self._last_state_id = None
         self._status_label.setText('')
 
     # -------------------------------------------------------------------------
