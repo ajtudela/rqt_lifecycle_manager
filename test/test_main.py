@@ -20,6 +20,8 @@ replaced by a stub: the test asserts on the arguments it receives instead of
 actually opening a window.
 """
 
+import sys
+
 from rqt_lifecycle_manager import main as main_module
 
 
@@ -45,6 +47,29 @@ def test_main_launches_the_plugin_standalone(monkeypatch):
     assert len(_FakeRqtMain.calls) == 1
     _, standalone = _FakeRqtMain.calls[0]
     assert standalone == main_module.PLUGIN
+
+
+def test_main_forwards_sys_argv_by_default(monkeypatch):
+    """With no explicit args, sys.argv is forwarded to rqt."""
+    _FakeRqtMain.calls = []
+    monkeypatch.setattr(main_module, 'Main', _FakeRqtMain)
+
+    main_module.main()
+
+    argv, _ = _FakeRqtMain.calls[0]
+    assert argv is sys.argv
+
+
+def test_main_forwards_explicit_args(monkeypatch):
+    """An explicit args list overrides sys.argv."""
+    _FakeRqtMain.calls = []
+    monkeypatch.setattr(main_module, 'Main', _FakeRqtMain)
+    custom_args = ['rqt_lifecycle_manager', '--force-discover']
+
+    main_module.main(custom_args)
+
+    argv, _ = _FakeRqtMain.calls[0]
+    assert argv is custom_args
 
 
 def test_plugin_path_points_at_the_plugin_class():
