@@ -81,6 +81,11 @@ class LifecycleManagerWidget(QWidget):
     ----------
     node : rclpy.node.Node
         The ROS 2 node (spun by ``rqt_gui_py``) used to talk to the graph.
+    manager : LifecycleManager, optional
+        Backend to use instead of building a fresh ``LifecycleManager(node)``.
+        Mainly intended for tests, which can inject a stub instead of
+        monkey-patching the private ``_manager`` attribute after
+        construction.
 
     """
 
@@ -90,21 +95,25 @@ class LifecycleManagerWidget(QWidget):
     transitions_received = Signal(str, list)
     change_state_result = Signal(str, bool, str)
 
-    def __init__(self, node) -> None:
+    def __init__(self, node, manager: Optional[LifecycleManager] = None) -> None:
         """
         Build the widget and start the non-blocking refresh timer.
 
         Parameters
         ----------
         node : rclpy.node.Node
-            The ROS 2 node used to create the lifecycle manager backend.
+            The ROS 2 node used to create the lifecycle manager backend,
+            when ``manager`` is not provided.
+        manager : LifecycleManager, optional
+            Backend to use instead of building a fresh
+            ``LifecycleManager(node)``.
 
         """
         super().__init__()
         self.setObjectName('LifecycleManagerWidget')
         self.setWindowTitle('Lifecycle Manager')
 
-        self._manager = LifecycleManager(node)
+        self._manager = manager if manager is not None else LifecycleManager(node)
         self._selected_node: Optional[str] = None
         self._known_nodes: List[str] = []
         # Cache of the transitions currently shown, to avoid needless rebuilds.
