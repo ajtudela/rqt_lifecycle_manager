@@ -155,6 +155,46 @@ def test_node_list_is_not_rebuilt_when_unchanged(widget):
     assert view._node_list.item(0) is first_item
 
 
+def test_discovering_nodes_polls_their_initial_state(widget):
+    """Every newly discovered node gets a one-off initial state read."""
+    view, manager = widget
+    manager.names = ['/a', '/b']
+
+    view._refresh()
+
+    polled = {node_name for node_name, _ in manager.state_requests}
+    assert polled == {'/a', '/b'}
+
+
+def test_discovering_nodes_subscribes_to_their_transition_events(widget):
+    """Every newly discovered node gets a push-based state subscription.
+
+    This is what lets the node list act as a dashboard: every row can show
+    its own state without polling every node on each refresh cycle.
+    """
+    view, manager = widget
+    manager.names = ['/a', '/b']
+
+    view._refresh()
+
+    subscribed = {node_name for node_name, _ in manager.subscribed_nodes}
+    assert subscribed == {'/a', '/b'}
+
+
+def test_rediscovering_the_same_nodes_does_not_repoll_or_resubscribe(widget):
+    """An unchanged node set does not re-issue the initial setup calls."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+    polls_before = len(manager.state_requests)
+    subscriptions_before = len(manager.subscribed_nodes)
+
+    view._refresh()
+
+    assert len(manager.state_requests) == polls_before
+    assert len(manager.subscribed_nodes) == subscriptions_before
+
+
 def test_selecting_a_node_polls_its_state(widget):
     """Selecting a node shows its name and polls its state."""
     view, manager = widget
@@ -168,17 +208,6 @@ def test_selecting_a_node_polls_its_state(widget):
     assert manager.state_requests[-1][0] == '/a'
     # Transitions are only queried once the state response arrives.
     assert manager.transition_requests == []
-
-
-def test_selecting_a_node_subscribes_to_its_transition_events(widget):
-    """Selecting a node also subscribes to its push-based state updates."""
-    view, manager = widget
-    manager.names = ['/a']
-    view._refresh()
-
-    _select_first_node(view)
-
-    assert manager.subscribed_nodes[-1][0] == '/a'
 
 
 def test_periodic_refresh_does_not_re_poll_the_selected_node(widget):
@@ -226,25 +255,18 @@ def test_vanished_node_releases_its_service_clients(widget):
     assert manager.released_nodes == ['/a']
 
 
-def test_switching_selection_releases_the_previous_node(widget):
-    """Selecting a new node frees the clients of the one left behind."""
+def test_switching_selection_keeps_the_previous_node_subscribed(widget):
+    """Selecting a new node does not release the one left behind.
+
+    Every discovered node stays subscribed for the dashboard regardless of
+    which one is selected, so deselecting a node must not tear that down.
+    """
     view, manager = widget
     manager.names = ['/a', '/b']
     view._refresh()
     view._node_list.setCurrentRow(0)
 
     view._node_list.setCurrentRow(1)
-
-    assert manager.released_nodes == ['/a']
-
-
-def test_first_selection_releases_nothing(widget):
-    """Selecting a node with nothing previously selected releases none."""
-    view, manager = widget
-    manager.names = ['/a']
-    view._refresh()
-
-    _select_first_node(view)
 
     assert manager.released_nodes == []
 
@@ -285,6 +307,73 @@ def test_empty_selection_is_ignored(widget):
     view._on_node_selected()
 
     assert view._selected_node == '/a'
+
+
+# ---------------------------------------------------------------------------
+# Dashboard icons
+# ---------------------------------------------------------------------------
+
+
+def _item_icon_color(item):
+    """Return the hex color of a list item's solid-fill icon."""
+    return item.icon().pixmap(1, 1).toImage().pixelColor(0, 0).name()
+
+
+def test_node_without_a_known_state_has_no_icon(widget):
+    """Before any state is reported, a node's row has no icon."""
+    view, manager = widget
+    manager.names = ['/a']
+
+    view._refresh()
+
+    assert view._node_list.item(0).icon().isNull()
+
+
+@pytest.mark.parametrize('state_id, colour', [
+    (1, '#607d8b'),
+    (2, '#fb8c00'),
+    (3, '#43a047'),
+    (4, '#e53935'),
+    (13, '#29b6f6'),
+])
+def test_reported_state_colors_the_node_row(widget, state_id, colour):
+    """Reporting a node's state paints its row with the matching color."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+
+    view._update_state('/a', state_id, 'some-label')
+
+    item = view._node_list.item(0)
+    assert not item.icon().isNull()
+    assert _item_icon_color(item) == colour
+
+
+def test_unselected_node_still_gets_its_dashboard_icon(widget):
+    """The dashboard icon updates even for a node that is not selected."""
+    view, manager = widget
+    manager.names = ['/a', '/b']
+    view._refresh()
+    _select_first_node(view)
+
+    view._update_state('/b', 3, 'active')
+
+    other_item = view._node_list.item(1)
+    assert other_item.text() == '/b'
+    assert not other_item.icon().isNull()
+
+
+def test_vanished_node_forgets_its_cached_dashboard_state(widget):
+    """A node leaving the graph drops its cached state along with it."""
+    view, manager = widget
+    manager.names = ['/a']
+    view._refresh()
+    view._update_state('/a', 3, 'active')
+
+    manager.names = []
+    view._refresh()
+
+    assert '/a' not in view._node_states
 
 
 # ---------------------------------------------------------------------------

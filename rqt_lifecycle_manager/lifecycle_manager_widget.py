@@ -15,18 +15,19 @@
 """
 Qt widget for the rqt Lifecycle Manager plugin.
 
-The widget lists every lifecycle node, shows the current state of the selected
-node and offers a button per available transition. Results coming from ROS 2
+The widget lists every lifecycle node, color-coding each row with its current
+state as a lightweight dashboard, shows the full state of the selected node
+and offers a button per available transition. Results coming from ROS 2
 arrive on the executor thread and are delivered to this GUI thread through Qt
 signals, which keeps the interface fully responsive at all times.
 """
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from python_qt_binding.QtCore import Qt, QTimer, Signal
-from python_qt_binding.QtGui import QPalette
+from python_qt_binding.QtGui import QColor, QIcon, QPalette, QPixmap
 from python_qt_binding.QtWidgets import (
     QCheckBox,
     QGroupBox,
@@ -72,6 +73,10 @@ _MIN_REFRESH_INTERVAL_MS = 200
 _MAX_REFRESH_INTERVAL_MS = 10000
 _REFRESH_INTERVAL_STEP_MS = 100
 
+# Side, in pixels, of the solid-color square icon used to show each node's
+# state directly in the node list (the "dashboard" view).
+_DASHBOARD_ICON_SIZE = 12
+
 
 class LifecycleManagerWidget(QWidget):
     """
@@ -116,6 +121,9 @@ class LifecycleManagerWidget(QWidget):
         self._manager = manager if manager is not None else LifecycleManager(node)
         self._selected_node: Optional[str] = None
         self._known_nodes: List[str] = []
+        # Last known state id of every currently discovered node, used to
+        # color-code the node list as a lightweight dashboard.
+        self._node_states: Dict[str, int] = {}
         # Cache of the transitions currently shown, to avoid needless rebuilds.
         self._displayed_transitions: Optional[
             List[Tuple[int, str, str]]] = None
@@ -223,34 +231,53 @@ class LifecycleManagerWidget(QWidget):
 
         The selected node's state is not re-polled here: it is queried once
         when selected and kept current afterwards by the push-based
-        ``transition_event`` subscription set up in ``_on_node_selected``.
+        ``transition_event`` subscription every discovered node gets in
+        ``_refresh_nodes``.
         """
         self._refresh_nodes()
 
     def _refresh_nodes(self) -> None:
-        """Rebuild the node list widget only when the set of nodes changes."""
+        """Rebuild the node list widget only when the set of nodes changes.
+
+        Every newly discovered node gets an initial state read plus a
+        standing ``transition_event`` subscription, so the list can show
+        each node's state at a glance (like a small dashboard) without
+        polling all of them on every cycle. Nodes that leave the graph have
+        their resources released and their cached state dropped.
+        """
         names = self._manager.get_lifecycle_node_names()
         if names == self._known_nodes:
             return
+        previous_names = self._known_nodes
         self._known_nodes = names
+
+        for name in set(names) - set(previous_names):
+            self._manager.async_get_state(name, self.state_received.emit)
+            self._manager.subscribe_to_transitions(
+                name, self.state_received.emit)
+        for name in set(previous_names) - set(names):
+            self._manager.release_node(name)
+            self._node_states.pop(name, None)
 
         selected = self._selected_node
         # Block signals so the programmatic rebuild does not fire callbacks.
         self._node_list.blockSignals(True)
         self._node_list.clear()
         for name in names:
-            self._node_list.addItem(QListWidgetItem(name))
+            item = QListWidgetItem(name)
+            if name in self._node_states:
+                item.setIcon(self._state_icon(self._node_states[name]))
+            self._node_list.addItem(item)
         if selected in names:
             items = self._node_list.findItems(selected, Qt.MatchFlag.MatchExactly)
             if items:
                 self._node_list.setCurrentItem(items[0])
         self._node_list.blockSignals(False)
 
-        # The previously selected node disappeared from the graph: drop its
-        # cached service clients along with the details panel.
+        # The previously selected node disappeared from the graph (its
+        # resources were already released above): just reset the panel.
         if selected is not None and selected not in names:
             self._selected_node = None
-            self._manager.release_node(selected)
             self._clear_details()
 
     def _poll_selected(self) -> None:
@@ -272,23 +299,23 @@ class LifecycleManagerWidget(QWidget):
     # -------------------------------------------------------------------------
 
     def _on_node_selected(self) -> None:
-        """Handle a change in the selected lifecycle node."""
+        """Handle a change in the selected lifecycle node.
+
+        The node is already subscribed to push-based updates (every
+        discovered node is, for the dashboard) and switching away from it
+        does not release that subscription, since its row still needs to
+        stay current. Only a one-off read is issued here to populate the
+        detail panel immediately, without waiting for the next event.
+        """
         items = self._node_list.selectedItems()
         if not items:
             return
-        previous = self._selected_node
         self._selected_node = items[0].text()
-        # Release the clients of the node we are switching away from.
-        if previous is not None and previous != self._selected_node:
-            self._manager.release_node(previous)
         self._node_label.setText(self._selected_node)
         self._status_label.setText('')
         # Force a rebuild and a fresh transitions query for the new node.
         self._displayed_transitions = None
         self._last_state_id = None
-        # Push-based updates from now on, plus one initial read.
-        self._manager.subscribe_to_transitions(
-            self._selected_node, self.state_received.emit)
         self._poll_selected()
 
     def _on_auto_refresh_toggled(self, enabled: bool) -> None:
@@ -319,7 +346,14 @@ class LifecycleManagerWidget(QWidget):
     def _update_state(
         self, node_name: str, state_id: int, state_label: str
     ) -> None:
-        """Display the reported state of a node if it is still selected."""
+        """Record the reported state and refresh the panel if still selected.
+
+        Every discovered node's state is cached and reflected as a small
+        icon next to its name in the list, regardless of selection; the
+        detail panel below is only updated for the currently selected node.
+        """
+        self._node_states[node_name] = state_id
+        self._apply_node_item_icon(node_name, state_id)
         if node_name != self._selected_node:
             return
         text = state_label.upper() if state_label else 'UNKNOWN'
@@ -396,6 +430,20 @@ class LifecycleManagerWidget(QWidget):
             widget = self._transitions_layout.itemAt(index).widget()
             if isinstance(widget, QPushButton):
                 widget.setEnabled(enabled)
+
+    def _apply_node_item_icon(self, node_name: str, state_id: int) -> None:
+        """Color-code a node's row in the list to show its state at a glance."""
+        items = self._node_list.findItems(node_name, Qt.MatchFlag.MatchExactly)
+        if items:
+            items[0].setIcon(self._state_icon(state_id))
+
+    @staticmethod
+    def _state_icon(state_id: int) -> QIcon:
+        """Build a small solid-color icon representing a lifecycle state."""
+        color = QColor(_STATE_COLORS.get(state_id, _TRANSITION_STATE_COLOR))
+        pixmap = QPixmap(_DASHBOARD_ICON_SIZE, _DASHBOARD_ICON_SIZE)
+        pixmap.fill(color)
+        return QIcon(pixmap)
 
     def _reset_state_style(self) -> None:
         """Restore the neutral style of the state label.
