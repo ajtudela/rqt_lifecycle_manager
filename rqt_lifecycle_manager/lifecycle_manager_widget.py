@@ -26,6 +26,7 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 
 from python_qt_binding.QtCore import Qt, QTimer, Signal
+from python_qt_binding.QtGui import QPalette
 from python_qt_binding.QtWidgets import (
     QCheckBox,
     QGroupBox,
@@ -374,10 +375,19 @@ class LifecycleManagerWidget(QWidget):
                 widget.setEnabled(enabled)
 
     def _reset_state_style(self) -> None:
-        """Restore the neutral style of the state label."""
+        """Restore the neutral style of the state label.
+
+        The neutral colors are derived from the active Qt palette (instead
+        of being hardcoded for a light theme), so the label stays legible
+        under a dark rqt theme too. The semantic state colors in
+        ``_STATE_COLORS`` are kept as-is since they carry meaning.
+        """
+        palette = self.palette()
+        background = palette.color(QPalette.ColorRole.Window).name()
+        foreground = palette.color(QPalette.ColorRole.WindowText).name()
         self._state_label.setStyleSheet(
-            'background-color: #eceff1; color: #37474f; font-weight: bold; '
-            'padding: 6px; border-radius: 4px;')
+            f'background-color: {background}; color: {foreground}; '
+            f'font-weight: bold; padding: 6px; border-radius: 4px;')
 
     def _clear_details(self) -> None:
         """Reset the details panel when no node is selected."""
