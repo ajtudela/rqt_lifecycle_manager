@@ -23,6 +23,7 @@ without needing a display server or a live ROS 2 graph.
 import pytest
 from python_qt_binding.QtGui import QPalette
 from python_qt_binding.QtWidgets import QLabel, QPushButton
+from rqt_lifecycle_manager.lifecycle_manager import LifecycleManager
 from rqt_lifecycle_manager.lifecycle_manager_widget import (
     LifecycleManagerWidget,
 )
@@ -66,7 +67,7 @@ class _FakeManager:
 
 
 class _FakeNode:
-    """Minimal node stub; the real manager is swapped out after building."""
+    """Minimal node stub; unused once a stub manager is injected."""
 
     def get_service_names_and_types(self):
         """Report an empty ROS 2 graph."""
@@ -75,12 +76,33 @@ class _FakeNode:
 
 @pytest.fixture
 def widget(qapp):
-    """Build a widget backed by a stub manager and tear it down after use."""
-    view = LifecycleManagerWidget(_FakeNode())
+    """Build a widget backed by an injected stub manager, then tear it down."""
     manager = _FakeManager()
-    # Replace the real backend so the tests observe the requests it receives.
-    view._manager = manager
+    view = LifecycleManagerWidget(_FakeNode(), manager=manager)
     yield view, manager
+    view.shutdown()
+
+
+# ---------------------------------------------------------------------------
+# Backend injection
+# ---------------------------------------------------------------------------
+
+
+def test_injected_manager_is_used_as_is(qapp):
+    """An explicitly injected manager is used instead of building one."""
+    manager = _FakeManager()
+
+    view = LifecycleManagerWidget(_FakeNode(), manager=manager)
+
+    assert view._manager is manager
+    view.shutdown()
+
+
+def test_defaults_to_building_a_real_manager(qapp):
+    """Without an explicit manager, a real LifecycleManager is built."""
+    view = LifecycleManagerWidget(_FakeNode())
+
+    assert isinstance(view._manager, LifecycleManager)
     view.shutdown()
 
 
