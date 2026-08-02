@@ -219,9 +219,13 @@ class LifecycleManagerWidget(QWidget):
     # -------------------------------------------------------------------------
 
     def _refresh(self) -> None:
-        """Refresh the node list and re-poll the selected node."""
+        """Refresh the discovered node list.
+
+        The selected node's state is not re-polled here: it is queried once
+        when selected and kept current afterwards by the push-based
+        ``transition_event`` subscription set up in ``_on_node_selected``.
+        """
         self._refresh_nodes()
-        self._poll_selected()
 
     def _refresh_nodes(self) -> None:
         """Rebuild the node list widget only when the set of nodes changes."""
@@ -250,12 +254,13 @@ class LifecycleManagerWidget(QWidget):
             self._clear_details()
 
     def _poll_selected(self) -> None:
-        """Asynchronously request the state of the selected node.
+        """Asynchronously request a one-off state read of the selected node.
 
-        The available transitions are a deterministic function of the
-        current state, so they are only re-queried from ``_update_state``
-        when the reported ``state_id`` actually changes, instead of on
-        every polling cycle.
+        Used right after selecting a node (to get an initial reading before
+        the first ``transition_event`` arrives) and right after requesting a
+        transition. The available transitions are a deterministic function
+        of the current state, so they are only re-queried from
+        ``_update_state`` when the reported ``state_id`` actually changes.
         """
         if self._selected_node is None:
             return
@@ -281,6 +286,9 @@ class LifecycleManagerWidget(QWidget):
         # Force a rebuild and a fresh transitions query for the new node.
         self._displayed_transitions = None
         self._last_state_id = None
+        # Push-based updates from now on, plus one initial read.
+        self._manager.subscribe_to_transitions(
+            self._selected_node, self.state_received.emit)
         self._poll_selected()
 
     def _on_auto_refresh_toggled(self, enabled: bool) -> None:
