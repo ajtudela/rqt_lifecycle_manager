@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rqt_lifecycle_manager</name>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <description>rqt plugin to list ROS 2 lifecycle nodes and change their states from a non-blocking graphical interface.
   </description>
   <maintainer email="ajtudela@gmail.com">Alberto Tudela</maintainer>
