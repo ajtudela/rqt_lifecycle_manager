@@ -227,7 +227,8 @@ class LifecycleManagerWidget(QWidget):
     # -------------------------------------------------------------------------
 
     def _refresh(self) -> None:
-        """Refresh the discovered node list.
+        """
+        Refresh the discovered node list.
 
         The selected node's state is not re-polled here: it is queried once
         when selected and kept current afterwards by the push-based
@@ -237,7 +238,8 @@ class LifecycleManagerWidget(QWidget):
         self._refresh_nodes()
 
     def _refresh_nodes(self) -> None:
-        """Rebuild the node list widget only when the set of nodes changes.
+        """
+        Rebuild the node list widget only when the set of nodes changes.
 
         Every newly discovered node gets an initial state read plus a
         standing ``transition_event`` subscription, so the list can show
@@ -281,7 +283,8 @@ class LifecycleManagerWidget(QWidget):
             self._clear_details()
 
     def _poll_selected(self) -> None:
-        """Asynchronously request a one-off state read of the selected node.
+        """
+        Asynchronously request a one-off state read of the selected node.
 
         Used right after selecting a node (to get an initial reading before
         the first ``transition_event`` arrives) and right after requesting a
@@ -299,7 +302,8 @@ class LifecycleManagerWidget(QWidget):
     # -------------------------------------------------------------------------
 
     def _on_node_selected(self) -> None:
-        """Handle a change in the selected lifecycle node.
+        """
+        Handle a change in the selected lifecycle node.
 
         The node is already subscribed to push-based updates (every
         discovered node is, for the dashboard) and switching away from it
@@ -346,7 +350,8 @@ class LifecycleManagerWidget(QWidget):
     def _update_state(
         self, node_name: str, state_id: int, state_label: str
     ) -> None:
-        """Record the reported state and refresh the panel if still selected.
+        """
+        Record the reported state and refresh the panel if still selected.
 
         Every discovered node's state is cached and reflected as a small
         icon next to its name in the list, regardless of selection; the
@@ -446,7 +451,8 @@ class LifecycleManagerWidget(QWidget):
         return QIcon(pixmap)
 
     def _reset_state_style(self) -> None:
-        """Restore the neutral style of the state label.
+        """
+        Restore the neutral style of the state label.
 
         The neutral colors are derived from the active Qt palette (instead
         of being hardcoded for a light theme), so the label stays legible
