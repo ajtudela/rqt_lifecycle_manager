@@ -167,7 +167,8 @@ def test_discovering_nodes_polls_their_initial_state(widget):
 
 
 def test_discovering_nodes_subscribes_to_their_transition_events(widget):
-    """Every newly discovered node gets a push-based state subscription.
+    """
+    Every newly discovered node gets a push-based state subscription.
 
     This is what lets the node list act as a dashboard: every row can show
     its own state without polling every node on each refresh cycle.
@@ -211,7 +212,8 @@ def test_selecting_a_node_polls_its_state(widget):
 
 
 def test_periodic_refresh_does_not_re_poll_the_selected_node(widget):
-    """Once selected, the timer-driven refresh no longer polls the state.
+    """
+    Once selected, the timer-driven refresh no longer polls the state.
 
     State updates arrive via the transition_event subscription instead; the
     periodic refresh only re-scans the discovered node list.
@@ -256,7 +258,8 @@ def test_vanished_node_releases_its_service_clients(widget):
 
 
 def test_switching_selection_keeps_the_previous_node_subscribed(widget):
-    """Selecting a new node does not release the one left behind.
+    """
+    Selecting a new node does not release the one left behind.
 
     Every discovered node stays subscribed for the dashboard regardless of
     which one is selected, so deselecting a node must not tear that down.
